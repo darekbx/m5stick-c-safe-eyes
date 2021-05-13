@@ -21,25 +21,25 @@
 
 #include <M5StickC.h>
 
-#define SHORT_BREAK_INTERVAL_M 15 // Minutes
-#define SHORT_BREAK_TIME_S 15 // Seconds
-#define SHORT_BREAKS 7
-String shortBreaks[SHORT_BREAKS] = { 
+#define BREAK_INTERVAL 900 // Seconds 15 mins
+#define SHORT_BREAK_TIME 15 // Seconds
+#define LONG_BREAK_TIME 60 // Seconds
+#define BREAKS 9
+
+String breakMessages[BREAKS] = { 
   "Tightly close eyes", 
   "Roll your eyes a few times to each side", 
   "Rotate your eyes in clockwise direction",
   "Rotate your eyes in counterclockwise direction",
+  "Walk for a white", 
   "Blink your eyes", 
   "Focus on a point in the far distance",
-  "Have some water"
+  "Have some water",
+  "Lean back at your seat and relax"
 };
 
-#define LONG_BREAK_INTERVAL_M 75 // Minutes
-#define LONG_BREAK_TIME_S 60 // Seconds
-#define LONG_BREAKS 2
-String longBreaks[LONG_BREAKS] = { 
-  "Walk for a white", 
-  "Lean back at your seat and relax"
+byte longBreakIndex[2] = {
+  4, 8
 };
 
 RTC_TimeTypeDef TimeStruct;
@@ -47,17 +47,8 @@ RTC_TimeTypeDef TimeStruct;
 int loopDelay = 100;
 int batteryLevelOffset = 12;
 int currentBreakIndex = -1;
-int currentLongBreakIndex = -1;
 bool isBreakActive = false;
 bool isLongBreakActive = false;
-
-static uint16_t color16(uint16_t r, uint16_t g, uint16_t b) {
-  uint16_t _color;
-  _color = (uint16_t)(r & 0xF8) << 8;
-  _color |= (uint16_t)(g & 0xFC) << 3;
-  _color |= (uint16_t)(b & 0xF8) >> 3;
-  return _color;
-}
 
 void setup() {
   M5.begin();
@@ -81,31 +72,35 @@ void loop() {
 
   handleCancelButton();
 
-  if (TimeStruct.Minutes == LONG_BREAK_INTERVAL_M) {
-    currentLongBreakIndex = currentLongBreakIndex + 1;
-    if (currentLongBreakIndex >= LONG_BREAKS) {
-      currentLongBreakIndex = 0;
-    }
-    isLongBreakActive = true;
-    notifyBreak();
-  
-  } else if (TimeStruct.Minutes == SHORT_BREAK_INTERVAL_M) {
+  if (TimeStruct.Minutes >= (BREAK_INTERVAL / 60)) {
     currentBreakIndex = currentBreakIndex + 1;
-    if (currentBreakIndex >= SHORT_BREAKS) {
+    if (currentBreakIndex >= BREAKS) {
       currentBreakIndex = 0;
     }
-    isBreakActive = true;
+
+    for (int i = 0; i < 2; i++) {
+      if (currentBreakIndex == longBreakIndex[i]) {
+        isLongBreakActive = true;
+        break;
+      }
+    }
+
+    if (!isLongBreakActive) {
+      isBreakActive = true;
+    }
+    
     notifyBreak();
   }
 
-  if (isLongBreakActive) {
-    displayBreak(longBreaks[currentLongBreakIndex]);
-    if (TimeStruct.Seconds == LONG_BREAK_TIME_S) {
+  if (isBreakActive) {
+    displayBreak(breakMessages[currentBreakIndex]);
+    if (TimeStruct.Seconds >= SHORT_BREAK_TIME) {
       clearBreak();
     }
-  } else if (isBreakActive) {
-    displayBreak(shortBreaks[currentBreakIndex]);
-    if (TimeStruct.Seconds == SHORT_BREAK_TIME_S) {
+  }
+  if (isLongBreakActive) {
+    displayLongBreak(breakMessages[currentBreakIndex]);
+    if (TimeStruct.Minutes >= (LONG_BREAK_TIME / 60)) {
       clearBreak();
     }
   }
@@ -116,6 +111,13 @@ void loop() {
 void displayBreak(String text) {
   M5.Lcd.setCursor(1, 20, 2);
   M5.Lcd.print(text);
+}
+
+void displayLongBreak(String text) {
+  M5.Lcd.setCursor(1, 20, 2);
+  M5.Lcd.print(text);
+  M5.Lcd.setCursor(40, 60, 2);
+  M5.Lcd.print("(long break)");
 }
 
 void notifyBreak() {
@@ -141,7 +143,7 @@ void displayTime() {
   M5.Lcd.setCursor(122, 4, 1);
   M5.Rtc.GetTime(&TimeStruct);
 
-  if (isBreakActive) {
+  if (isBreakActive || isLongBreakActive) {
     M5.Lcd.setTextColor(GREEN);
   }
   
@@ -151,6 +153,7 @@ void displayTime() {
 
 void clearBreak() {
   isBreakActive = false;
+  isLongBreakActive = false;
   setUpTime(0, 0, 0);
   M5.Lcd.fillRect(0, batteryLevelOffset + 1, 160, 80, BLACK);
   digitalWrite(M5_LED, HIGH);
