@@ -24,6 +24,7 @@
 #define BREAK_INTERVAL 900 // Seconds 15 mins
 #define SHORT_BREAK_TIME 15 // Seconds
 #define LONG_BREAK_TIME 60 // Seconds
+#define BREAK_BLINK_DELAY 500 // Milliseconds
 #define BREAKS 9
 
 String breakMessages[BREAKS] = { 
@@ -49,6 +50,7 @@ int batteryLevelOffset = 12;
 int currentBreakIndex = -1;
 bool isBreakActive = false;
 bool isLongBreakActive = false;
+bool breakBlinkFlag = false;
 
 void setup() {
   M5.begin();
@@ -72,6 +74,10 @@ void loop() {
 
   handleCancelButton();
 
+  if (isBreakActive) {
+    blikDuringBreak();
+  } 
+    
   if (TimeStruct.Minutes >= (BREAK_INTERVAL / 60)) {
     currentBreakIndex = currentBreakIndex + 1;
     if (currentBreakIndex >= BREAKS) {
@@ -106,6 +112,16 @@ void loop() {
   }
   
   delay(loopDelay);
+}
+
+void blikDuringBreak() {
+  if (breakBlinkFlag) {
+    digitalWrite(M5_LED, LOW);
+  } else {
+    digitalWrite(M5_LED, HIGH);
+  }
+  delay(BREAK_BLINK_DELAY);
+  breakBlinkFlag = !breakBlinkFlag;  
 }
 
 void displayBreak(String text) {
